@@ -5,7 +5,7 @@ import pytest
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import (
     InMemorySpanExporter,
 )
-from project_1.chat import chat_response
+from project_1.chat import answer_question
 
 SMOKE_INPUTS: list[str] = json.loads(
     (Path(__file__).parent / "smoke_inputs.json").read_text()
@@ -15,7 +15,7 @@ SMOKE_INPUTS: list[str] = json.loads(
 @pytest.mark.parametrize("message", SMOKE_INPUTS)
 def test_chat_response_returns_valid_answer(message: str) -> None:
     """The function returns a non-empty string ."""
-    result = chat_response(message)
+    result = answer_question(message)
 
     # The output must not be empty.
     assert result != "", (
@@ -43,14 +43,14 @@ def test_chat_response_emits_a_span(
 ) -> None:
     """A chat_response span is exported after each call."""
     span_exporter.clear()
-    chat_response("Who should I contact about a broken streetlight?")
+    answer_question("Who should I contact about a broken streetlight?")
 
     spans = span_exporter.get_finished_spans()
     assert len(spans) > 0, (
         "No spans exported after chat_response call"
     )
     span_names = [s.name for s in spans]
-    assert "chat_response" in span_names, (
-        f"Expected 'chat_response' span. "
+    assert "chat_response.request" in span_names, (
+        f"Expected 'chat_response.request' span. "
         f"Spans found: {span_names}"
     )

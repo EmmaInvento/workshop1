@@ -1,43 +1,118 @@
-from .client import call_model
+"""Business orchestration for the Municipal Front-Desk Assistant."""
+
+import time
+import uuid
+from datetime import UTC, datetime
+from typing import Any
+
+from .client import AssistantError, ModelCallResult, call_model
+from .config import (
+    DIAGNOSTICS_PATH,
+    MODEL_NAME,
+    PHOENIX_COLLECTOR_ENDPOINT,
+    PHOENIX_PROJECT_NAME,
+    PROMPT_VERSION,
+    ConfigurationError,
+    validate_model_configuration,
+)
+from .diagnostics import append_diagnostic, build_model_call_event
 from .prompts.loader import load_prompt
 from .tracing import get_tracer
 
-#OFFICES = [] #In the future we might have to classify the office the custumer has to contact
-
 tracer = get_tracer(__name__)
 
-def chat_response(message:str) -> str:
+# Write the event of the model call if the diagnostic path was configured
+def _write_model_call_event(
+    *,
+    request_id: str,
+    instructions: str,
+    query: str,
+    started_at: datetime,
+    started_clock: float,
+    result: ModelCallResult | None = None,
+    error: AssistantError | None = None,
+) -> None:
+    """Write a local event when optional JSONL diagnostics are enabled."""
+    if DIAGNOSTICS_PATH is None: #If we do not define a path -> we do not write diagnostic
+        return
+
+    event = build_model_call_event( 
+        request_id=request_id,
+        prompt_version=PROMPT_VERSION,
+        instructions=instructions,
+        user_input=query,
+        requested_model=MODEL_NAME,
+        phoenix_endpoint=PHOENIX_COLLECTOR_ENDPOINT,
+        phoenix_project=PHOENIX_PROJECT_NAME,
+        diagnostics_path=DIAGNOSTICS_PATH,
+        started_at=started_at,
+        latency_ms=(time.perf_counter() - started_clock) * 1000,
+        result=result,
+        error=error,
+    )
+    append_diagnostic(DIAGNOSTICS_PATH, event)
+
+
+def _run_model_call(query: str, request_id: str, api_client: Any = None) -> str:
+    """Load the prompt, call the model, and record optional diagnostics."""
     instructions = load_prompt("instruction")
-    
-    
-    with tracer.start_as_current_span(
-        "chat_response"
-    ) as span:
-        response = call_model(
-            instructions = instructions, 
-            user_input = message,
-            )
-        span.set_attribute("response", response)                                 
-        return response
-    
+    started_at = datetime.now(UTC)  
+    started_clock = time.perf_counter()
 
-'''
-VALID_OFFICES = {
-    
-}
+    try:
+        result = call_model( 
+            instructions=instructions,
+            user_input=query,
+            api_client=api_client,
+        )
+    except AssistantError as exc:
+        _write_model_call_event( #regoster error
+            request_id=request_id,
+            instructions=instructions,
+            query=query,
+            started_at=started_at,
+            started_clock=started_clock,
+            error=exc,
+        )
+        raise #raise error
+
+    _write_model_call_event( # register result if no error was raised
+        request_id=request_id,
+        instructions=instructions,
+        query=query,
+        started_at=started_at,
+        started_clock=started_clock,
+        result=result,
+    )
+    return result.output_text # take text output only
 
 
-def validate_office(office: str) -> str:
-    """Check that the model returned a known office."""
-    with tracer.start_as_current_span(
-        "validate_office"
-    ) as span:
-        span.set_attribute("raw_office", office)
-        if office in VALID_CATEGORIES:
-            span.set_attribute("valid", True)
-            return office
-        span.set_attribute("valid", False)
-        return "other" 
-'''        
+def answer_question(
+    query: str,
+    request_id: str | None = None,
+    api_client: Any = None,
+) -> str:
+    """Run the complete municipal question-answering path."""
+    if not query.strip():
+        raise ConfigurationError("The municipal question must not be empty.") #error is before client call
+    if api_client is None:
+        validate_model_configuration()
+
+    resolved_request_id = request_id or str(uuid.uuid4()) # if no request_id -> generate one
+    with tracer.start_as_current_span("chat_response.request") as span:
+        span.set_attribute("municipal.request_id", resolved_request_id)
+        span.set_attribute("municipal.prompt_version", PROMPT_VERSION)
+        try:
+            answer = _run_model_call(query.strip(), resolved_request_id, api_client)
+        except AssistantError as exc:
+            span.set_attribute("municipal.outcome", "error")
+            span.set_attribute("municipal.error_family", exc.family)
+            raise
+        span.set_attribute("municipal.outcome", "success")
+        return answer
+
+
+
+
 
 

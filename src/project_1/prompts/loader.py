@@ -1,7 +1,10 @@
+"""Location-independent prompt loading."""
+
 from pathlib import Path
 
-PROMPTS_DIR = Path(__file__).parent
+PROMPTS_DIR = Path(__file__).resolve().parent
 
-def load_prompt(file_name:str) -> str:
-    path = PROMPTS_DIR / f"{file_name}.txt"
-    return path.read_text(encoding = "utf-8").strip()
+
+def load_prompt(name: str) -> str:
+    """Load a named UTF-8 prompt without depending on the working directory."""
+    return (PROMPTS_DIR / f"{name}.txt").read_text(encoding="utf-8").strip()
