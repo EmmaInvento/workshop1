@@ -1754,6 +1754,7 @@ version = "0.1.0"
 source = { editable = "." }
 dependencies = [
     { name = "arize-phoenix" },
+    { name = "arize-phoenix-client" },
     { name = "arize-phoenix-otel" },
     { name = "openai" },
     { name = "openinference-instrumentation-openai" },
@@ -1768,6 +1769,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "arize-phoenix", specifier = ">=20.14.0" },
+    { name = "arize-phoenix-client", specifier = ">=3.5.0" },
     { name = "arize-phoenix-otel", specifier = ">=0.17.1" },
     { name = "openai", specifier = ">=3.15.0" },
     { name = "openinference-instrumentation-openai", specifier = ">=0.1.60" },

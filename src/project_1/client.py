@@ -2,6 +2,7 @@ from dataclasses import dataclass #Allows to easly create classes containing dat
 from typing import Any # Any can be any type of variable
 from .config import MODEL_NAME, validate_model_configuration
 
+
 from openai import (
     APIConnectionError,
     APIError,
@@ -91,7 +92,9 @@ def _model_dump(value: Any) -> Any:
 def call_model(
     instructions: str,
     user_input: str,
+    *,
     api_client: Any = None,
+    max_output_tokens: int = 1024,
 ) -> ModelCallResult:
     """Send one request and return its text with diagnostic metadata."""
     # If client in input use it otherwise use defoult client (OpenAI())
@@ -102,6 +105,8 @@ def call_model(
             model=MODEL_NAME,
             instructions=instructions,
             input=user_input,
+            max_output_tokens=max_output_tokens,
+            text={"format": {"type": "json_object"}},
         )
     except APIError as exc: # If instead an APIError is obtained, save it as exc
         family, message = error_message(exc) # From error gives us family and message
@@ -125,8 +130,3 @@ def call_model(
         raw_response=_model_dump(response),
         usage=_model_dump(getattr(response, "usage", None)),
     )
-
-
-
-
-    

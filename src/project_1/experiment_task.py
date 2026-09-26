@@ -4,7 +4,6 @@ import time
 import uuid
 from datetime import UTC, datetime
 from typing import Any
-import json
 
 from .client import AssistantError, ModelCallResult, call_model
 from .config import (
@@ -19,8 +18,14 @@ from .config import (
 from .diagnostics import append_diagnostic, build_model_call_event
 from .prompts.loader import load_prompt
 from .tracing import get_tracer
+from .contract import validate
+import json
+import os
+
+
 
 tracer = get_tracer(__name__)
+
 
 # Write the event of the model call if the diagnostic path was configured
 def _write_model_call_event(
@@ -56,7 +61,7 @@ def _write_model_call_event(
 
 def _run_model_call(query: str, request_id: str, api_client: Any = None) -> str:
     """Load the prompt, call the model, and record optional diagnostics."""
-    instructions = load_prompt("instruction", PROMPT_VERSION)
+    instructions = load_prompt("instruction_v1")
     started_at = datetime.now(UTC)  
     started_clock = time.perf_counter()
 
@@ -87,17 +92,46 @@ def _run_model_call(query: str, request_id: str, api_client: Any = None) -> str:
     )
     return result.output_text # take text output only
 
-def _parse_model_output(raw_output: str) -> dict:
-    try:
-        return json.loads(raw_output)
-    except json.JSONDecodeError as exc:
-        raise AssistantError(
-            "malformed_response",
-            "The model returned invalid JSON.",
-            original_error=exc,
-        ) from exc
 
 
+PROMPT_VERSION = os.getenv("PROMPT_VERSION", "v1")
+
+def answer_question(input: dict) -> dict:
+    """Task: answer qestion and return the model
+    output for scoring."""
+    text = input["text"]
+    instructions = load_prompt("instruction", PROMPT_VERSION)
+    raw = call_model(
+        instructions=instructions,
+        user_input=text,
+    ).output_text
+    contract = validate(raw) #check if output contract is verified -> string can be converte in json
+    parsed = json.loads(raw) if contract["valid"] else {} #convert in json
+    return {
+        "raw_output": raw,
+        "contract_valid": contract["valid"],
+        "contract_violations": contract["violations"],
+        "answer": parsed.get("answer"),
+        "fields": parsed.get("fields"),
+        "urgency_level": parsed.get("urgency_level"),
+        "urgency_rationale": parsed.get("urgency_rationale"),
+        "model": MODEL_NAME,
+        "prompt_version": PROMPT_VERSION,
+    }
+
+
+
+
+
+
+
+
+
+
+
+
+
+'''
 def answer_question(
     query: str,
     request_id: str | None = None,
@@ -114,14 +148,46 @@ def answer_question(
         span.set_attribute("municipal.request_id", resolved_request_id)
         span.set_attribute("municipal.prompt_version", PROMPT_VERSION)
         try:
-            raw_output = _run_model_call(query.strip(), resolved_request_id, api_client)
-            answer = _parse_model_output(raw_output)
+            answer = _run_model_call(query.strip(), resolved_request_id, api_client)
+            contract = validate(answer)
+            parsed = json.loads(answer) if contract["valid"] else {}
         except AssistantError as exc:
             span.set_attribute("municipal.outcome", "error")
             span.set_attribute("municipal.error_family", exc.family)
             raise
         span.set_attribute("municipal.outcome", "success")
-        return answer
+        return {
+        "raw_output": answer,
+        "contract_valid": contract["valid"],
+        "contract_violations": contract["violations"],
+        "answer": parsed.get("answer"),
+        "fields": parsed.get("fields"),
+        "urgency_level": parsed.get("urgency_level"),
+        "urgency_rationale": parsed.get("urgency_rationale"),
+        "model": MODEL_NAME,
+        "prompt_version": PROMPT_VERSION,
+    }
+
+'''
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
