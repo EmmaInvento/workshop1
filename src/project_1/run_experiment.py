@@ -4,6 +4,8 @@ from phoenix.client import Client
 from phoenix.client.experiments import run_experiment
 from .config import MODEL_NAME, PHOENIX_BASE_URL
 from .tracing import setup_tracing
+from .provenance import code_provenance
+from datetime import UTC, datetime
 
 DATASET_NAME = "municipal-assistent-golden"
 
@@ -15,7 +17,7 @@ def _model_slug() -> str:
 def main() -> None:
     setup_tracing()
 
-    from .evaluators import urgency_level_correct, contract_valid, answer_within_limit, rationale_within_limit, name_correct, reference_number_correct, amount_correct, date_correct
+    from .evaluators import EVALUATOR_VERSION, urgency_level_correct, contract_valid, answer_within_limit, rationale_within_limit, name_correct, reference_number_correct, amount_correct, date_correct
     from .experiment_task import PROMPT_VERSION, answer_question
 
     dry_run_env = os.getenv("DRY_RUN")
@@ -29,6 +31,7 @@ def main() -> None:
         dataset=DATASET_NAME,
         version_id=version_id or None,
     )
+    provenance = code_provenance()
     purpose = (
         "dryrun" if dry_run else ("baseline" if PROMPT_VERSION == "v3" else "candidate")
     )
@@ -47,8 +50,12 @@ def main() -> None:
             "prompt_version": PROMPT_VERSION,
             "model": MODEL_NAME,
             "dataset_version": dataset.version_id,
-            "max_output_tokens": 1024,
-            "purpose": purpose,
+            "max_output_tokens": 1024, #will be saved as invocation param
+            "evaluator_version": EVALUATOR_VERSION,
+            "purpose" : purpose,
+            **provenance,
+            "dependency_lock": "uv.lock",
+            "run_started_at": datetime.now(UTC).isoformat(),
         },
         client=client,
         dry_run=dry_run,

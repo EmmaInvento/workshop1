@@ -83,18 +83,18 @@ def validate(raw_response: str) -> dict:
 
 
     # 7. Rationale must be a string of at most
-        #    30 words.
-        rationale = parsed.get("rationale", "")
-        if isinstance(rationale, str):
-            word_count = len(rationale.split())
-            if word_count == 0:
-                violations.append("Rationale is empty")
-            elif word_count > MAX_RATIONALE_WORDS:
-                violations.append(
-                    f"Rationale has {word_count} words (max {MAX_RATIONALE_WORDS})"
-                )
-        else:
-            violations.append("Rationale is not a string")
+    #    30 words.
+    rationale = parsed.get("urgency_rationale", "")
+    if isinstance(rationale, str):
+        word_count = len(rationale.split())
+        if word_count == 0:
+            violations.append("Rationale is empty")
+        elif word_count > MAX_RATIONALE_WORDS:
+            violations.append(
+                f"Rationale has {word_count} words (max {MAX_RATIONALE_WORDS})"
+            )
+    else:
+        violations.append("Rationale is not a string")
     
     # 8. Subfields must be strings (or None for optional fields).
     for subfield in actual_subfields:

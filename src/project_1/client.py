@@ -28,8 +28,12 @@ class ModelCallResult:
     output_text: str
     resolved_model: str | None
     response_id: str | None
+    response_status: str | None
+    incomplete_reason: str | None
+    refusal: str | None
     raw_response: Any
     usage: Any
+    
 
 # Create AssistantError: can be personilized
 # associate with a family and a message easy to understand
@@ -56,7 +60,7 @@ def _default_client() -> OpenAI:
 
     validate_model_configuration() #check API key and url are present
     if _default_client_instance is None: #first call
-        _default_client_instance = OpenAI()
+        _default_client_instance = OpenAI(max_retries=0)
     return _default_client_instance
 
 
@@ -87,6 +91,21 @@ def _model_dump(value: Any) -> Any:
     return value
 
 
+# 
+def _refusal_text(response: object) -> str | None:
+    output_items = getattr(response, "output", None) or () #prende tutti i campi di response
+    for output_item in output_items: #per ogni campo
+        content_items = getattr(output_item, "content", None) or () #prende tutti i contenuti
+        for content_item in content_items: #per ogni contenuto
+            if getattr(content_item, "type", None) == "refusal": #controlla se è un refusal
+                refusal = getattr(content_item, "refusal", None) #prendi il testo del refusal
+                if isinstance(refusal, str): #se è una stringa
+                    return refusal #ritornala
+    return None
+
+
+
+
 # Call model: takes instruction, user_input and can take client
 # Output: ModelCallResult
 def call_model(
@@ -94,7 +113,7 @@ def call_model(
     user_input: str,
     *,
     api_client: Any = None,
-    max_output_tokens: int = 1024,
+    max_output_tokens: int = 1024, #set explicitly (if it changes I have stored this as invocation param)
 ) -> ModelCallResult:
     """Send one request and return its text with diagnostic metadata."""
     # If client in input use it otherwise use defoult client (OpenAI())
@@ -117,6 +136,7 @@ def call_model(
         ) from exc
 
     answer = response.output_text.strip()
+    incomplete_details = response.incomplete_details #contiene info sul motivo per cui la risposta viene interrotta
     if not answer: #If the string is empty
         raise AssistantError(
             "malformed_response",
@@ -126,7 +146,12 @@ def call_model(
     return ModelCallResult(
         output_text=answer,
         resolved_model=getattr(response, "model", None),
-        response_id=getattr(response, "id", None),
+        response_id=response.id,
+        response_status=response.status,
+        incomplete_reason=(
+            incomplete_details.reason if incomplete_details is not None else None
+        ),
+        refusal=_refusal_text(response),
         raw_response=_model_dump(response),
         usage=_model_dump(getattr(response, "usage", None)),
     )

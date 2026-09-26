@@ -6,79 +6,76 @@ EVALUATOR_VERSION = "contract"
 tracer = trace.get_tracer(__name__)
 
 
+Result = tuple[float | None, str, str]
+
+
+def _operational_error(output: dict) -> Result | None:
+    if output.get("error") is not None:
+        return (None, "error", f"Task failed: {output.get('error_type')}")
+    return None
+
+
+def _quality_result(ok: bool, explanation: str = "") -> Result:
+    return (1.0 if ok else 0.0, "pass" if ok else "fail", explanation)
+
+
+
+
 @create_evaluator(name="contract_valid", kind="CODE")
-def contract_valid(output: dict) -> bool:
-    """Check the complete machine-readable output contract."""
-    return output.get("contract_valid") is True
+def contract_valid(output: dict) -> Result:
+    if (error := _operational_error(output)) is not None:
+        return error
+    ok = output.get("contract_valid") is True
+    violations = output.get("contract_violations")
+    explanation = "" if ok else f"Contract violations: {violations}"
+    return _quality_result(ok, explanation)
 
 
 @create_evaluator(name="urgency_level_correct", kind="CODE")
-def urgency_level_correct(output: dict, expected: dict) -> bool:
-    """Check that the urgency level matches the expected value."""
+def urgency_level_correct(output: dict, expected: dict) -> Result:
+    if (error := _operational_error(output)) is not None:
+        return error
     urgency_level = output.get("urgency_level")
     expected_urgency_level = expected.get("expected_urgency_level")
-    return (
-        isinstance(urgency_level, str)
-        and isinstance(expected_urgency_level, str)
-        and urgency_level == expected_urgency_level
-    )
+    ok = isinstance(urgency_level, str) and isinstance(expected_urgency_level, str) and urgency_level == expected_urgency_level
+    return _quality_result(ok)
     
     
 @create_evaluator(name="name_correct", kind="CODE")
 def name_correct(output: dict, expected: dict) -> bool:
-    """Check that the name matches the expected value."""
+    if (error := _operational_error(output)) is not None:
+        return error
     person_name = output.get("fields", {}).get("person_name")
     expected_person_name = expected.get("expected_name")
-    return (
-        person_name is None
-        and expected_person_name is None
-    ) or (
-        isinstance(person_name, str)
-        and isinstance(expected_person_name, str)
-        and person_name == expected_person_name
-    )    
+    ok = (person_name is None and expected_person_name is None) or (isinstance(person_name, str) and isinstance(expected_person_name, str) and person_name == expected_person_name)
+    return _quality_result(ok) 
 
 @create_evaluator(name="reference_number_correct", kind="CODE")
 def reference_number_correct(output: dict, expected: dict) -> bool:
-    """Check that the reference_number matches the expected value."""
+    if (error := _operational_error(output)) is not None:
+        return error
     reference_number = output.get("fields", {}).get("reference_number")
     expected_reference_number = expected.get("expected_reference_number")
-    return (
-        reference_number is None
-        and expected_reference_number is None
-    ) or (
-        isinstance(reference_number, str)
-        and isinstance(expected_reference_number, str)
-        and reference_number == expected_reference_number
-    )     
+    ok = (reference_number is None and expected_reference_number is None) or (isinstance(reference_number, str) and isinstance(expected_reference_number, str) and reference_number == expected_reference_number)
+    return _quality_result(ok)    
     
 @create_evaluator(name="amount_correct", kind="CODE")
 def amount_correct(output: dict, expected: dict) -> bool:
-    """Check that the amount matches the expected value."""
+    if (error := _operational_error(output)) is not None:
+        return error
     amount = output.get("fields", {}).get("amount")
     expected_amount = expected.get("expected_amount")
-    return (
-        amount is None
-        and expected_amount is None
-    ) or (
-        isinstance(amount, str)
-        and isinstance(expected_amount, str)
-        and amount == expected_amount
-    )  
+    ok = (amount is None and expected_amount is None) or (isinstance(amount, str) and isinstance(expected_amount, str) and amount == expected_amount)
+    return _quality_result(ok) 
     
 @create_evaluator(name="date_correct", kind="CODE")
 def date_correct(output: dict, expected: dict) -> bool:
-    """Check that the date matches the expected value."""
+    if (error := _operational_error(output)) is not None:
+        return error
     date = output.get("fields", {}).get("date")
     expected_date = expected.get("expected_date")
-    return (
-        date is None
-        and expected_date is None
-    ) or (
-        isinstance(date, str)
-        and isinstance(expected_date, str)
-        and date == expected_date
-    )            
+    ok = (date is None and expected_date is None) or (isinstance(date, str) and isinstance(expected_date, str) and date == expected_date)
+    return _quality_result(ok)            
     
 
 
@@ -111,4 +108,3 @@ def rationale_within_limit(output: dict) -> bool:
         return result    
         
         
-   
