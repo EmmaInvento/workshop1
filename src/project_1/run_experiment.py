@@ -30,7 +30,7 @@ def main() -> None:
         version_id=version_id or None,
     )
     purpose = (
-        "dryrun" if dry_run else ("baseline" if PROMPT_VERSION == "v2" else "candidate")
+        "dryrun" if dry_run else ("baseline" if PROMPT_VERSION == "v3" else "candidate")
     )
     name = f"{PROMPT_VERSION}-{_model_slug()}-{purpose}"
 
