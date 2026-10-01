@@ -36,6 +36,7 @@ def build_model_call_event(
     started_at: datetime,
     latency_ms: float,
     result: ModelCallResult | None = None,
+    structured_output: AssistantOutput | None = None,
     error: AssistantError | None = None,
 ) -> dict[str, Any]:
     """Build one complete success or failure event."""
@@ -63,6 +64,7 @@ def build_model_call_event(
         "raw_response": result.raw_response if result else None,
         "usage": result.usage if result else None,
         "output_text": result.output_text if result else None,
+        "structured_output": structured_output,
         "latency_ms": round(latency_ms, 3),
         "outcome": "success" if result else "error",
         "error": _error_details(error) if error else None,

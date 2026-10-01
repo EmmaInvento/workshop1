@@ -1,5 +1,108 @@
 """Business orchestration for the Municipal Front-Desk Assistant."""
 
+from collections.abc import Callable, Mapping
+from typing import Any
+
+from ..assistant_output import validate_assistant_output
+from ..config import PROMPT_VERSION
+from ..prompts.loader import load_prompt
+
+ModelCall = Callable[[str, str], str] #ModelCall is a type for any function that takes two strings (instructions and user_input) and returns a string (the model's output).
+
+def run_task(
+    user_input: str,
+    *,
+    model_call: ModelCall | None = None,
+    api_client: Any = None,
+) -> dict[str, Any]:
+    """Call the application prompt and return a serializable task result."""
+    instructions = load_prompt("instruction", PROMPT_VERSION)
+    call = model_call or _default_model_call(api_client)
+    raw_output = call(instructions, user_input)
+    validation = validate_assistant_output(raw_output)
+
+    if not validation["valid"]:
+        return {
+            "raw_output": raw_output,
+            "contract_valid": False,
+            "errors": validation["errors"],
+        }
+
+    return {
+        "raw_output": raw_output,
+        "output": validation["output"],
+        "contract_valid": True,
+        "errors": [],
+    }
+    
+
+def _default_model_call(api_client: Any) -> ModelCall:
+    from ..client import call_model
+
+    def call(instructions: str, user_input: str) -> str:
+        return call_model(
+            instructions=instructions,
+            user_input=user_input,
+            api_client=api_client,
+        ).output_text
+
+    return call
+
+
+def run_dataset_case(input: Mapping[str, Any]) -> dict[str, Any]:
+    """Run one Phoenix dataset example and return its structured output."""
+    text = input.get("text")
+    if not isinstance(text, str) or not text.strip():
+        return {
+            "_contract_valid": False,
+            "_errors": ["Dataset input must contain non-empty text."],
+        }
+
+    result = run_task(text.strip())
+    if not result.get("contract_valid"):
+        return {
+            "_contract_valid": False,
+            "_errors": result.get("errors", []),
+            "_raw_output": result.get("raw_output"),
+        }
+
+    output = dict(result["output"])
+    output["_contract_valid"] = True
+    output["_raw_output"] = result.get("raw_output")
+    return output
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+'''
+
 import json
 import os
 
@@ -10,7 +113,6 @@ from opentelemetry.trace import StatusCode
 from .client import ModelCallResult, call_model
 from .config import MODEL_NAME
 from .contract import validate
-from .prompts.loader import load_prompt
 from .retry import MAX_RETRIES, RETRYABLE, call_with_retry
 
 
@@ -235,7 +337,7 @@ def answer_question(input: dict, metadata: dict) -> dict[str, object]:
     return output
 
 
-
+'''
 
 
 

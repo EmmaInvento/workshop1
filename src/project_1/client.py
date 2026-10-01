@@ -82,6 +82,7 @@ def error_message(exc: APIError) -> tuple[str, str]:
 
 
 # Convert value in a jason (if is not None and if attribute "model_dump" exists)
+# we do not want to store the SDK model objects (raw_response)
 def _model_dump(value: Any) -> Any:
     """Convert SDK models into JSON-compatible diagnostic data."""
     if value is None:
@@ -146,7 +147,7 @@ def call_model(
     return ModelCallResult(
         output_text=answer,
         resolved_model=getattr(response, "model", None),
-        response_id=response.id,
+        response_id=getattr(response, "id", None),
         response_status=response.status,
         incomplete_reason=(
             incomplete_details.reason if incomplete_details is not None else None

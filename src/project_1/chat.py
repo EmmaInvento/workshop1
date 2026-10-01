@@ -6,6 +6,9 @@ from datetime import UTC, datetime
 from typing import Any
 import json
 
+from opentelemetry import trace
+from .assistant_output import AssistantOutput, validate_assistant_output
+
 from .client import AssistantError, ModelCallResult, call_model
 from .config import (
     DIAGNOSTICS_PATH,
@@ -31,6 +34,7 @@ def _write_model_call_event(
     started_at: datetime,
     started_clock: float,
     result: ModelCallResult | None = None,
+    structured_output: AssistantOutput | None = None,
     error: AssistantError | None = None,
 ) -> None:
     """Write a local event when optional JSONL diagnostics are enabled."""
@@ -50,6 +54,7 @@ def _write_model_call_event(
         latency_ms=(time.perf_counter() - started_clock) * 1000,
         result=result,
         error=error,
+        structured_output=structured_output,
     )
     append_diagnostic(DIAGNOSTICS_PATH, event)
 
@@ -66,43 +71,63 @@ def _run_model_call(query: str, request_id: str, api_client: Any = None) -> str:
             user_input=query,
             api_client=api_client,
         )
+    # If we get an error from the call
     except AssistantError as exc:
-        _write_model_call_event( #regoster error
+        _write_model_call_event( #register error
             request_id=request_id,
             instructions=instructions,
             query=query,
             started_at=started_at,
             started_clock=started_clock,
-            error=exc,
+            error=exc, #keep error not result
         )
         raise #raise error
+    
+    validation = validate_assistant_output(result.output_text) #validate output text
+    structured_output = validation["output"]
+    # If you get errors from validation
+    if structured_output is None:
+        output_error = AssistantError(
+            "malformed_response",
+            "; ".join(validation["errors"]),
+        )
+        _write_model_call_event(
+            request_id=request_id,
+            instructions=instructions,
+            query=query,
+            started_at=started_at,
+            started_clock=started_clock,
+            error=output_error,
+        )
+        raise output_error
 
+    # If we don't get errors from validation
     _write_model_call_event( # register result if no error was raised
         request_id=request_id,
         instructions=instructions,
         query=query,
         started_at=started_at,
         started_clock=started_clock,
-        result=result,
+        result=result, #keep result not error
+        structured_output=structured_output, #keep structured output
     )
-    return result.output_text # take text output only
+    
+    current_span = trace.get_current_span()
+    current_span.set_attribute("municipal.urgency_level", structured_output["urgency_level"])
+    current_span.set_attribute(
+        "municipal.extracted_fields",
+        json.dumps(structured_output["fields"], ensure_ascii=False),
+    )
+    return structured_output
 
-def _parse_model_output(raw_output: str) -> dict:
-    try:
-        return json.loads(raw_output)
-    except json.JSONDecodeError as exc:
-        raise AssistantError(
-            "malformed_response",
-            "The model returned invalid JSON.",
-            original_error=exc,
-        ) from exc
+
 
 
 def answer_question(
     query: str,
     request_id: str | None = None,
     api_client: Any = None,
-) -> dict:
+) -> str:
     """Run the complete municipal question-answering path."""
     if not query.strip():
         raise ConfigurationError("The municipal question must not be empty.") #error is before client call
@@ -114,14 +139,13 @@ def answer_question(
         span.set_attribute("municipal.request_id", resolved_request_id)
         span.set_attribute("municipal.prompt_version", PROMPT_VERSION)
         try:
-            raw_output = _run_model_call(query.strip(), resolved_request_id, api_client)
-            answer = _parse_model_output(raw_output)
+            output = _run_model_call(query.strip(), resolved_request_id, api_client)
         except AssistantError as exc:
             span.set_attribute("municipal.outcome", "error")
             span.set_attribute("municipal.error_family", exc.family)
             raise
         span.set_attribute("municipal.outcome", "success")
-        return answer
+        return output["answer"]
 
 
 

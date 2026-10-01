@@ -1,0 +1,207 @@
+{
+  "dataset_id": "workshop-2-golden-v1",
+  "description": "Synthetic fixed cases for information extraction and urgency assessment.",
+  "version": 1,
+  "cases": [
+    {
+      "input": {
+        "text": "My name is Elena Maric, my application reference is CS-4827, and I paid 75 euros for the permit last Tuesday. Where should I send the receipt?"
+      },
+      "output": {
+        "fields": {
+          "person_name": "Elena Maric",
+          "reference_number": "CS-4827",
+          "amount": 75.0,
+          "date": "last Tuesday"
+        },
+        "urgency_level": "routine",
+        "urgency_rationale": "The resident is asking about a receipt for a past payment, with no stated deadline, immediate hazard, or public-impact concern."
+      },
+      "metadata": {
+        "case_id": "extract-001",
+        "tag": "representative",
+        "note": "Representative case containing all extraction fields."
+      }
+    },
+    {
+      "input": {
+        "text": "The appointment is booked for tomorrow at 10:30, and the reference number is LT-2048. Which details should I include in the request?"
+      },
+      "output": {
+        "fields": {
+          "person_name": null,
+          "reference_number": "LT-2048",
+          "amount": null,
+          "date": "tomorrow at 10:30"
+        },
+        "urgency_level": "time_sensitive",
+        "urgency_rationale": "The resident identifies an appointment tomorrow, so useful clarification is needed soon, but no immediate safety or public-impact risk is described."
+      },
+      "metadata": {
+        "case_id": "extract-002",
+        "tag": "representative",
+        "note": "Representative case with optional extraction fields absent."
+      }
+    },
+    {
+      "input": {
+        "text": "I am Marco Bianchi. I sent the form on 3 April, but I cannot find the confirmation number. Could you check whether the form was received?"
+      },
+      "output": {
+        "fields": {
+          "person_name": "Marco Bianchi",
+          "reference_number": null,
+          "amount": null,
+          "date": "3 April"
+        },
+        "urgency_level": "routine",
+        "urgency_rationale": "The resident reports a missing confirmation after sending a form, but gives no immediate deadline, hazard, or public-impact concern."
+      },
+      "metadata": {
+        "case_id": "extract-003",
+        "tag": "edge",
+        "note": "Incomplete request where the absent reference must remain null."
+      }
+    },
+    {
+      "input": {
+        "text": "Bonjour, my name is Claire Dubois. Mon numéro de dossier est FR-7719 and the amount paid was 42,50 euros. Pouvez-vous confirmer que ces informations sont bien enregistrées ?"
+      },
+      "output": {
+        "fields": {
+          "person_name": "Claire Dubois",
+          "reference_number": "FR-7719",
+          "amount": 42.5,
+          "date": null
+        },
+        "urgency_level": "routine",
+        "urgency_rationale": "The resident asks to confirm payment information and describes no immediate deadline, hazard, or public-impact concern."
+      },
+      "metadata": {
+        "case_id": "extract-004",
+        "tag": "edge",
+        "note": "Mixed English/French request testing extraction beyond the main working language."
+      }
+    },
+    {
+      "input": {
+        "text": "The letter mentions 03/04 and case LT-3301, but it does not say which date format is intended. It was issued to Sofia Rinaldi. Could you tell me whether this means 3 April or 4 March?"
+      },
+      "output": {
+        "fields": {
+          "person_name": "Sofia Rinaldi",
+          "reference_number": "LT-3301",
+          "amount": null,
+          "date": "03/04"
+        },
+        "urgency_level": "routine",
+        "urgency_rationale": "The date format is unclear, but the request does not state a near-term deadline, immediate hazard, or public-impact concern."
+      },
+      "metadata": {
+        "case_id": "extract-005",
+        "tag": "edge",
+        "note": "Ambiguous date must be preserved as written rather than normalised to a guessed date."
+      }
+    },
+    {
+      "input": {
+        "text": "I would like to report a streetlight that stopped working yesterday outside 14 Valley Road. Nobody has been injured."
+      },
+      "output": {
+        "fields": {
+          "person_name": null,
+          "reference_number": null,
+          "amount": null,
+          "date": null
+        },
+        "urgency_level": "routine",
+        "urgency_rationale": "A public-lighting fault is reported, but the request states that nobody has been injured and gives no immediate hazard or deadline."
+      },
+      "metadata": {
+        "case_id": "urgency-001",
+        "tag": "representative",
+        "note": "Routine service fault with an explicit absence of injury."
+      }
+    },
+    {
+      "input": {
+        "text": "My appointment is tomorrow morning and I still do not know which documents to bring. Can you tell me what I should prepare?"
+      },
+      "output": {
+        "fields": {
+          "person_name": null,
+          "reference_number": null,
+          "amount": null,
+          "date": null
+        },
+        "urgency_level": "time_sensitive",
+        "urgency_rationale": "The resident identifies an appointment tomorrow, so useful clarification is needed soon, but no immediate safety or public-impact risk is described."
+      },
+      "metadata": {
+        "case_id": "urgency-002",
+        "tag": "representative",
+        "note": "Near-term appointment creates time pressure without an immediate hazard."
+      }
+    },
+    {
+      "input": {
+        "text": "A water pipe is leaking at the entrance of the public library, and staff are moving people away from the area."
+      },
+      "output": {
+        "fields": {
+          "person_name": null,
+          "reference_number": null,
+          "amount": null,
+          "date": null
+        },
+        "urgency_level": "urgent",
+        "urgency_rationale": "An active leak at a public entrance is already affecting access and staff are moving people away, indicating an immediate public-impact concern."
+      },
+      "metadata": {
+        "case_id": "urgency-003",
+        "tag": "edge",
+        "note": "Active public-building hazard with an immediate access and safety signal."
+      }
+    },
+    {
+      "input": {
+        "text": "My permit runs out soon, but I have also moved since it was issued. I am travelling tonight and need to know what to do."
+      },
+      "output": {
+        "fields": {
+          "person_name": null,
+          "reference_number": null,
+          "amount": null,
+          "date": null
+        },
+        "urgency_level": "time_sensitive",
+        "urgency_rationale": "The permit may expire soon and the resident has a same-day travel constraint, but the request does not describe an immediate safety or public-impact concern."
+      },
+      "metadata": {
+        "case_id": "urgency-004",
+        "tag": "edge",
+        "note": "Competing time signals require semantic assessment rather than keyword matching."
+      }
+    },
+    {
+      "input": {
+        "text": "The road has swallowed the drain cover outside the school again, and children walk past it every morning."
+      },
+      "output": {
+        "fields": {
+          "person_name": null,
+          "reference_number": null,
+          "amount": null,
+          "date": null
+        },
+        "urgency_level": "urgent",
+        "urgency_rationale": "A missing drain cover on a route used by children describes an immediate physical hazard with public exposure."
+      },
+      "metadata": {
+        "case_id": "urgency-005",
+        "tag": "edge",
+        "note": "Unusually phrased description of an immediate physical hazard."
+      }
+    }
+  ]
+}
