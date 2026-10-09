@@ -1,9 +1,7 @@
 from dataclasses import dataclass #Allows to easly create classes containing data
-from typing import Any # Any can be any type of variable
+from typing import Any, cast # Any can be any type of variable
 from .config import MODEL_NAME, validate_model_configuration
-
-
-from openai import (
+from openai import(
     APIConnectionError,
     APIError,
     APITimeoutError,
@@ -13,9 +11,25 @@ from openai import (
     RateLimitError,
 )
 
+
+from openai.types.responses import ResponseInputParam
+from typing import Literal, TypedDict
+from .assistant_output import AssistantOutput, validate_assistant_output
+from mistral_common.protocol.instruct.request import ChatCompletionRequest
+from mistral_common.tokens.tokenizers.mistral import MistralTokenizer
+
+
 # Create a defoult client variable which can either be OpenAI or None and 
 # initializes it to None (we do not have created a client yet)
 _default_client_instance: OpenAI | None = None 
+JSON_MODE_INSTRUCTION = "Return a valid json object."
+
+
+def uses_json_mode(instructions: str) -> bool:
+    """Whether the prompt requires a JSON object response or not."""
+    return "json object" in instructions.lower()
+
+
 
 
 # Create a class -> structure of response of model call
@@ -28,9 +42,6 @@ class ModelCallResult:
     output_text: str
     resolved_model: str | None
     response_id: str | None
-    response_status: str | None
-    incomplete_reason: str | None
-    refusal: str | None
     raw_response: Any
     usage: Any
     
@@ -60,7 +71,7 @@ def _default_client() -> OpenAI:
 
     validate_model_configuration() #check API key and url are present
     if _default_client_instance is None: #first call
-        _default_client_instance = OpenAI(max_retries=0)
+        _default_client_instance = OpenAI()
     return _default_client_instance
 
 
@@ -92,17 +103,37 @@ def _model_dump(value: Any) -> Any:
     return value
 
 
-# 
-def _refusal_text(response: object) -> str | None:
-    output_items = getattr(response, "output", None) or () #prende tutti i campi di response
-    for output_item in output_items: #per ogni campo
-        content_items = getattr(output_item, "content", None) or () #prende tutti i contenuti
-        for content_item in content_items: #per ogni contenuto
-            if getattr(content_item, "type", None) == "refusal": #controlla se è un refusal
-                refusal = getattr(content_item, "refusal", None) #prendi il testo del refusal
-                if isinstance(refusal, str): #se è una stringa
-                    return refusal #ritornala
-    return None
+
+
+def _request_options(
+    instructions: str,
+    user_input: str | list[dict[str, str]],
+) -> dict[str, Any]:
+    """ Add json mode only when the prompt requests a JSON object"""
+    # if no json object is requested, return a simple dict with input
+    if not uses_json_mode(instructions):
+        return {"input" : cast(Any, user_input)}
+    
+    messages = (
+        [{"role": "user", "content": user_input}]
+        if isinstance(user_input, str)
+        else list(user_input)
+    )
+    return {
+        "input": cast(
+            Any,
+            [
+                {"role": "developer", "content": JSON_MODE_INSTRUCTION},
+                *messages,
+            ],
+        ),
+        "text": {"format": {"type": "json_object"}},
+    }
+
+
+
+
+
 
 
 
@@ -111,10 +142,8 @@ def _refusal_text(response: object) -> str | None:
 # Output: ModelCallResult
 def call_model(
     instructions: str,
-    user_input: str,
-    *,
+    user_input: str | list[dict[str, str]],
     api_client: Any = None,
-    max_output_tokens: int = 1024, #set explicitly (if it changes I have stored this as invocation param)
 ) -> ModelCallResult:
     """Send one request and return its text with diagnostic metadata."""
     # If client in input use it otherwise use defoult client (OpenAI())
@@ -123,12 +152,12 @@ def call_model(
     try:
         response = selected_client.responses.create(
             model=MODEL_NAME,
-            instructions=instructions,
-            input=user_input,
-            max_output_tokens=max_output_tokens,
-            text={"format": {"type": "json_object"}},
+            instructions = instructions,
+            **_request_options(instructions, user_input),
         )
-    except APIError as exc: # If instead an APIError is obtained, save it as exc
+    except AssistantError:
+        raise
+    except Exception as exc: # If instead an APIError is obtained, save it as exc
         family, message = error_message(exc) # From error gives us family and message
         raise AssistantError(  # Raise the generic assistant error keeping the original one
             family,
@@ -137,22 +166,23 @@ def call_model(
         ) from exc
 
     answer = response.output_text.strip()
-    incomplete_details = response.incomplete_details #contiene info sul motivo per cui la risposta viene interrotta
     if not answer: #If the string is empty
         raise AssistantError(
             "malformed_response",
             "The API response contained no usable text. Inspect the Phoenix trace.",
         )
 
+
+
     return ModelCallResult(
         output_text=answer,
         resolved_model=getattr(response, "model", None),
         response_id=getattr(response, "id", None),
-        response_status=response.status,
-        incomplete_reason=(
-            incomplete_details.reason if incomplete_details is not None else None
-        ),
-        refusal=_refusal_text(response),
         raw_response=_model_dump(response),
         usage=_model_dump(getattr(response, "usage", None)),
     )
+    
+    
+
+
+

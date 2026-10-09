@@ -50,7 +50,7 @@ def test_chat_response_emits_a_span(
         "No spans exported after chat_response call"
     )
     span_names = [s.name for s in spans]
-    assert "chat_response.request" in span_names, (
-        f"Expected 'chat_response.request' span. "
+    assert "municipal_front_desk.request" in span_names, (
+        f"Expected 'municipal_front_desk.request' span. "
         f"Spans found: {span_names}"
     )

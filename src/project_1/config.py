@@ -15,7 +15,9 @@ class ConfigurationError(ValueError):
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 OPENAI_BASE_URL = os.getenv("OPENAI_BASE_URL")
 MODEL_NAME = os.getenv("MODEL_NAME", "openai/gpt-5-mini")
-PROMPT_VERSION = os.getenv("PROMPT_VERSION", "v1")
+PROMPT_VERSION = os.getenv("PROMPT_VERSION", "v6")
+CONTEXT_WINDOW_TOKENS = int(os.getenv("CONTEXT_WINDOW_TOKENS", "4096"))
+OUTPUT_BUFFER_TOKENS = int(os.getenv("OUTPUT_BUFFER_TOKENS", "400"))
 PHOENIX_BASE_URL: str = os.getenv(
     "PHOENIX_BASE_URL",
     "http://localhost:6006",
